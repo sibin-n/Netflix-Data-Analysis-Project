@@ -365,3 +365,5 @@ GROUP BY listed_in, TRIM(Artist)
 ORDER BY total_content DESC
 LIMIT 10;
 ```
+
+## Findings And Conclusion
