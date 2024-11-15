@@ -290,23 +290,54 @@ ORDER BY total_content DESC, country asc;
 ### 9. Does Netflix prioritize "fresh" content releases by genre in each country to maximize audience reach?
 
 ```sql
-WITH countries_fresh_genre AS (
-SELECT UNNEST(string_to_array(country,',')) AS available_country,
-release_year, type, listed_in FROM netflix_data
-WHERE date_added_year=release_year),
+WITH Countries_with_genre AS (
+SELECT 
+TRIM(UNNEST(string_to_array(country, ','))) AS available_country,
+release_year, date_added_year, listed_in
+FROM netflix_data),
 
-country_with_genre AS (
-SELECT TRIM(available_country) country, release_year, type, listed_in, COUNT(listed_in) Total_Content
-FROM countries_fresh_genre
-WHERE TRIM(available_country) <>''
-GROUP BY country, release_year, type, listed_in)
+Total_content AS (
+SELECT available_country,release_year, listed_in, COUNT(*) Total_content
+FROM Countries_with_genre
+GROUP BY available_country,release_year, listed_in),
 
-SELECT q.Country, q.release_year, type, q.listed_in, q.total_content FROM 
- (SELECT * ,
- RANK() OVER (PARTITION BY country, release_year,type ORDER BY total_content DESC) ranking
- FROM country_with_genre)q
-WHERE ranking =1
-ORDER BY total_content DESC, country asc;
+same_year_content AS (
+SELECT available_country AS Country, release_year, listed_in, COUNT(*) AS Total_content_with_same_year
+FROM countries_with_genre
+WHERE release_year = date_added_year
+GROUP BY Country, release_year, listed_in),
+
+content_with_same_year_and_total AS (
+SELECT 
+    t.available_country,
+    t.release_year,
+    t.listed_in,
+    t.Total_content,
+    Total_content_with_same_year
+FROM Total_content t
+JOIN Same_year_content s
+    ON t.available_country = s.Country 
+   AND t.release_year = s.release_year 
+   AND t.listed_in = s.listed_in
+ORDER BY t.Total_content DESC),
+
+genre_in_countries AS (
+SELECT r.available_country,
+    r.release_year,
+    r.listed_in,
+    r.Total_content,
+	r.total_content_with_same_year
+	FROM (
+SELECT *,
+RANK() OVER (PARTITION BY available_country, release_year ORDER BY total_content DESC) Ranking
+FROM Content_with_same_year_and_total
+WHERE available_country <>''
+ORDER BY total_content Desc)r
+WHERE ranking=1)
+
+SELECT *,
+ROUND((total_content_with_same_year::numeric/total_content)*100,2) achievement_rate
+FROM genre_in_countries;
 ```
 
 ### 10. Does Netflix prioritize "fresh" content releases by rating in each country based on local popularity?
@@ -366,4 +397,26 @@ ORDER BY total_content DESC
 LIMIT 10;
 ```
 
-## Findings And Conclusion
+## Findings
+- Most Netflix content for Movies and TV Shows is rated for mature audiences, with **60%** falling under the TV-MA rating. The remaining ratings are significantly lower by comparison. By expanding content in other rating categories, Netflix could potentially attract a broader audience and enhance viewership diversity.
+
+- The average yearly growth rate of Netflix content was around **176% for Movies** and **193% for TV Shows**. However, in **2020 and 2021**, this growth slowed, likely due to the **COVID-19 pandemic**, bringing the average growth rate down to **128% for Movies** and **163% for TV Shows**.
+
+- Netflix has been increasing its addition of “fresh” content (Movies & TV Shows released and added within the same year) compared to previous years. However, when comparing total Movies with their original release dates, Netflix still struggles to consistently deliver the content as fresh as possible, with an average freshness rating of **-4.618% from 2016-2021**. For TV Shows, there has been an average growth rate of **5.5%**, showing a steady but moderate increase in timely additions.
+
+- Netflix delivers a significant portion of its content to the United States, with **45%** of Movie content and **35%** of TV Show content available for U.S. viewers. This represents a notable disparity compared to other countries, highlighting a primary focus on the U.S. market.
+
+- Mature audience-rated content dominates Netflix's library globally, as most countries feature this rating prominently. However, certain countries stand out with a higher prevalence of other-rated content, surpassing mature audience ratings for both Movies and TV Shows.
+
+- In the United States, Netflix content leans heavily toward documentaries, while in India, popular genres include drama, international movies, or a combination of both. Japan's top genre is anime, reflecting varied preferences across countries. Although there’s minimal difference in genre distribution between Movies and TV Shows for most regions, some countries do show distinct preferences, with TV Show content differing slightly from Movies.
+
+- A few artists have appeared in specific genres more than 10 times, showcasing their strong association with those genres and their popularity within them.
+
+
+## Suggestions
+
+- Expand content in underrepresented ratings to attract broader demographics, particularly in regions where mature content is less dominant.
+
+- Aim to release Movies and TV Shows closer to their original release dates to capitalize on their initial buzz and increase audience engagement.
+
+- Promote frequently featured artists in specific genres to attract loyal fanbases and boost viewership.
