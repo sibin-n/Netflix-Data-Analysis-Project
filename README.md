@@ -1,4 +1,4 @@
-# Netflix Data Analysis Project Using SQL
+# Netflix Data Analysis Project Using SQL(PostgreSQL)
 
 ## Overview
 This analysis explores Netflix’s content strategy, focusing on content distribution, genre and rating preferences, and regional trends for Movies and TV Shows. Independently crafted questions guide the project to uncover audience trends, regional preferences, and insights for optimizing engagement and content reach.
