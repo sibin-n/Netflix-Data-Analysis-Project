@@ -333,7 +333,7 @@ RANK() OVER (PARTITION BY available_country, release_year ORDER BY total_content
 FROM Content_with_same_year_and_total
 WHERE available_country <>''
 ORDER BY total_content Desc)r
-WHERE ranking=1)
+WHERE ranking=1
 
 SELECT *,
 ROUND((total_content_with_same_year::numeric/total_content)*100,2) achievement_rate
