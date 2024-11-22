@@ -313,7 +313,7 @@ SELECT
     t.release_year,
     t.listed_in,
     t.Total_content,
-    Total_content_with_same_year
+    s.Total_content_with_same_year
 FROM Total_content t
 JOIN Same_year_content s
     ON t.available_country = s.Country 
