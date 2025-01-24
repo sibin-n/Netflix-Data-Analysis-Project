@@ -1,21 +1,21 @@
 # Netflix Data Analysis Project Using SQL(PostgreSQL)
 
-## Overview
-This analysis explores Netflix’s content strategy, focusing on content distribution, genre and rating preferences, and regional trends for Movies and TV Shows. Independently crafted questions guide the project to uncover audience trends, regional preferences, and insights for optimizing engagement and content reach.
+## Problem Statement
+Streaming platforms like Netflix host extensive catalogs of movies and TV shows but often face challenges in maximizing user engagement and retention. With a growing library of content, understanding patterns in viewer preferences and content characteristics is crucial for delivering personalized recommendations and curating engaging experiences. How can we analyze this dataset to extract actionable insights about the content catalog and its alignment with audience preferences?
 
 ## Objective
-Goal is to provide insights on optimizing content release strategies and improving audience engagement across different countries.
+To explore Netflix's content library and uncover insights into the distribution, diversity, and characteristics of movies and TV shows.
 
 ## Dataset
 
 Dataset is collected from Kaggle:
 
-- **Dataset Link:** [Netflix Dataset](https://www.kaggle.com/datasets/octopusteam/full-netflix-dataset)
+- **Dataset Link:** [Netflix Dataset](https://docs.google.com/spreadsheets/d/15aYozX751NvKL08zy7H0WyUZp7RLucV4271zrq0Q-nE/edit?gid=0#gid=0)
 
 ## Schema
 
 ```sql
-CREATE TABLE netflix_data
+CREATE TABLE netflix
 (
 	show_id	VARCHAR(10)PRIMARY KEY,
 	type VARCHAR(7),
@@ -35,93 +35,126 @@ CREATE TABLE netflix_data
 ## Data Cleaning
 
 ```sql
-SELECT show_id, COUNT(*) FROM netflix_data
+SELECT * FROM netflix;
+
+SELECT show_id, COUNT(*) FROM netflix
 GROUP BY show_id
-HAVING COUNT(*)>1; -- No Duplicate Rows are Present
+HAVING COUNT(*)>1;                       -- No Duplicate Value has been found -- 
 
-
--- Checking For Null Values
-
-SELECT COUNT(*) FROM netflix_data
+SELECT COUNT(*) FROM netflix
 WHERE show_id IS NULL OR show_id=''; -- show_id has no null values
 
-SELECT COUNT(*) FROM netflix_data
+SELECT COUNT(*) FROM netflix
 WHERE type IS NULL OR type='';       -- type has no null values
 
-SELECT COUNT(*) FROM netflix_data
+SELECT COUNT(*) FROM netflix
 WHERE title IS NULL OR title='';     -- title has no null values
 
-SELECT COUNT(*) FROM netflix_data
-WHERE director IS NULL OR director=''; -- Director have null Values(2634)
+SELECT COUNT(*) FROM netflix
+WHERE director IS NULL OR director=''; -- Director have null Values(2634)--
 
-SELECT COUNT(*) FROM netflix_data
-WHERE casts IS NULL OR casts='';       --  Casts have null values(825)
+SELECT COUNT(*) FROM netflix
+WHERE casts IS NULL OR casts='';       --  Casts have null values(825) --
 
-SELECT COUNT(*) FROM netflix_data
-WHERE country IS NULL OR country='';  --  Country have null values(831)
+SELECT COUNT(*) FROM netflix
+WHERE country IS NULL OR country='';  --  Country have null values(831) --
 
-SELECT COUNT(*) FROM netflix_data
-WHERE date_added IS NULL OR date_added='';  -- Date_added have null values(10)
+SELECT COUNT(*) FROM netflix
+WHERE date_added IS NULL OR date_added='';  -- Date_added have null values(10) --
 
-SELECT COUNT(*) FROM netflix_data
+SELECT COUNT(*) FROM netflix
 WHERE release_year IS NULL;               -- Release year have no null values
 
-SELECT COUNT(*) FROM netflix_data
-WHERE rating IS NULL OR rating='';       -- rating have null value(4)
+SELECT COUNT(*) FROM netflix
+WHERE rating IS NULL OR rating='';       -- rating have null value(4) --
 
-SELECT COUNT(*) FROM netflix_data
-WHERE duration IS NULL OR duration='';  -- duration have null value(3)
+SELECT COUNT(*) FROM netflix
+WHERE duration IS NULL OR duration='';  -- duration have null value(3) --
 
-SELECT COUNT(*) FROM netflix_data
+SELECT COUNT(*) FROM netflix
 WHERE listed_in IS NULL OR listed_in='';  -- listed_in have no null values
 
-SELECT COUNT(*) FROM netflix_data
+SELECT COUNT(*) FROM netflix
 WHERE description IS NULL OR description=''; -- description has no null values
 
 
 -- Replacing Director, Cast, Country with Unknown and rest is keep as null(null % below 5) --
 
-UPDATE netflix_data
-SET director = CASE WHEN director IS NULL THEN 'Unknown' ELSE director END,
-casts = CASE WHEN casts IS NULL THEN 'Unknown' ELSE casts END,
-country = CASE WHEN country IS NULL THEN 'Unknown' ELSE country END;
+UPDATE netflix
+SET director = CASE WHEN director IS NULL OR director='' THEN 'Unknown' ELSE director END,
+casts = CASE WHEN casts IS NULL OR casts='' THEN 'Unknown' ELSE casts END,
+country = CASE WHEN country IS NULL OR country='' THEN 'Unknown' ELSE country END;
 
 
--- Wrong Value changed from column rating --
+-- 1. Unique values in show_id
+SELECT DISTINCT show_id FROM netflix;
 
-SELECT COUNT(rating) FROM netflix_data
-WHERE rating LIKE '%min%';
+-- 2. Unique values in type
+SELECT DISTINCT type FROM netflix;
 
-UPDATE netflix_data                 
-SET rating= CASE WHEN rating LIKE '%min%' THEN NULL ELSE rating END;
+-- 3. Unique values in title
+SELECT DISTINCT title FROM netflix;
+
+-- 4. Unique values in director
+SELECT DISTINCT director FROM netflix;
+
+-- 5. Unique values in casts
+SELECT DISTINCT casts FROM netflix;
+
+-- 6. Unique values in country
+SELECT DISTINCT country FROM netflix;
+
+-- 7. Unique values in date_added
+SELECT DISTINCT date_added FROM netflix;
+
+-- 8. Unique values in release_year
+SELECT DISTINCT release_year FROM netflix
+ORDER BY release_year;
+
+-- 9. Unique values in rating
+SELECT DISTINCT rating FROM netflix;
+
+SELECT COUNT(rating) FROM netflix
+WHERE rating LIKE '%min%';     -- Need to Update --
+
+-- 10. Unique values in duration
+SELECT duration FROM netflix
+WHERE type='Movie'AND duration NOT LIKE '%min';
+
+SELECT duration FROM netflix
+WHERE type='Tv Show'AND duration NOT LIKE '%season%';
+
+-- 11. Unique values in listed_in
+SELECT DISTINCT listed_in FROM netflix;
+
+-- 12. Unique values in description
+SELECT DISTINCT description FROM netflix;
 
 
--- Formatting Date Column --
-
-UPDATE netflix_data
-SET date_added = TO_CHAR(TO_DATE(date_added, 'Month DD, YYYY'), 'YYYY-MM-DD');
-
-UPDATE netflix_data
-SET date_added = TO_DATE(date_added,'YYYY-MM-DD');
+-- Changed data error in rating
+UPDATE netflix               
+SET rating= CASE WHEN rating LIKE '%min%' THEN 'Unknown' ELSE rating END;
 
 
--- Inserted a new column with value year from date_added --
+-- Updating char to date
+UPDATE netflix
+SET date_added = TO_CHAR(TO_DATE(date_added, 'Month DD, YYYY'), 'YYYY-MM-DD')
+WHERE LENGTH(date_added)>10;
 
-ALTER TABLE netflix_data
-ADD COLUMN date_added_year INT;
+UPDATE netflix
+SET date_added= TO_DATE(date_added,'YYYY-MM-DD'); 
 
-UPDATE netflix_data
-SET date_added_year= CAST(LEFT(date_added, 4) AS INT);
-
-SELECT date_added,date_added_year FROM netflix_data;
+ALTER TABLE netflix
+ALTER COLUMN date_added TYPE DATE
+USING TO_DATE(date_added, 'YYYY-MM-DD');
 ```
 
 ## Analysis
 
-### 1. What is the current distribution of Movies vs. TV Shows in Netflix's catalog?
+### Current distribution of Movies vs. TV Shows in Netflix's catalog
 
 ```sql
-SELECT type, COUNT(*) Total_Content FROM netflix_data
+SELECT type, COUNT(*) total FROM netflix  -- Count of diff Content
 GROUP BY type;
 ```
 
