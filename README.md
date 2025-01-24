@@ -1,5 +1,5 @@
 # Netflix Data Analysis Project Using SQL(PostgreSQL)
-
+![Image](https://github.com/user-attachments/assets/f8f36c63-a4f3-437e-8a9a-63f92ce4622f)
 ## Problem Statement
 Streaming platforms like Netflix host extensive catalogs of movies and TV shows but often face challenges in maximizing user engagement and retention. With a growing library of content, understanding patterns in viewer preferences and content characteristics is crucial for delivering personalized recommendations and curating engaging experiences. How can we analyze this dataset to extract actionable insights about the content catalog and its alignment with audience preferences?
 
@@ -11,6 +11,17 @@ To explore Netflix's content library and uncover insights into the distribution,
 Dataset is collected from Kaggle:
 
 - **Dataset Link:** [Netflix Dataset](https://docs.google.com/spreadsheets/d/15aYozX751NvKL08zy7H0WyUZp7RLucV4271zrq0Q-nE/edit?gid=0#gid=0)
+
+## About
+The analysis focuses on understanding user behavior to ensure that the content aligns with what users truly want, helping to minimize churn.
+### Common User Behavior
+- Browsing Behavior
+- Time & Mood Dependency
+- Social Behavior
+- Multi Tasking
+- Decision Making Patterns
+- Viewing Habit
+- Exploring New Content
 
 ## Schema
 
@@ -157,300 +168,133 @@ USING TO_DATE(date_added, 'YYYY-MM-DD');
 SELECT type, COUNT(*) total FROM netflix  -- Count of diff Content
 GROUP BY type;
 ```
+![Image](https://github.com/user-attachments/assets/fa3acbcc-0803-4c41-941e-61d903dc40ea)
+#### Insight : More than 50% of content is movie.
 
-
-### 2. Which ratings are most common for Movies and TV Shows, and do certain ratings dominate specific content types?
+### 2. Yearly Trend
 
 ```sql
-WITH content_rating AS (
-SELECT type,rating, COUNT(*) Total_Count
-FROM netflix_data
-GROUP BY type,rating
-ORDER BY Total_Count DESC)
-
-SELECT r.type, r.rating, r.total_count FROM (
-SELECT *,
-           RANK() OVER (PARTITION BY type ORDER BY Total_Count DESC) AS ranking
-    FROM content_rating
-) r
-WHERE ranking=1;
+SELECT EXTRACT(YEAR FROM date_added) year_added, COUNT(CASE WHEN type='Movie' THEN 1 END) Movies,
+COUNT(CASE WHEN type='TV Show' THEN 1 END) TV_Shows FROM netflix
+GROUP BY EXTRACT(YEAR FROM date_added)
+ORDER BY year_added;
 ```
+![Image](https://github.com/user-attachments/assets/bbc8bd2a-29d2-4280-afe1-d2b979859776)
+#### Insight : Before COVID-19, the average content growth rate was 212% for movies and 96% for TV shows. Post-COVID, growth slowed to 177% for movies and 80% for TV shows.	
 
-### 3. Which years saw the highest volume of content added, and how does this break down between Movies and TV Shows?
+### 3. Content Released & Added Within a Year
 
 ```sql
--- For Movies
-SELECT date_added_year, COUNT(*)Total_Content FROM netflix_data
-WHERE type ='Movie'
-GROUP BY date_added_year
-ORDER BY Total_Content DESC
-LIMIT 10;
+SELECT EXTRACT(YEAR FROM date_added) year_added, COUNT(CASE WHEN type='Movie' THEN 1 END) Movies,
+COUNT(CASE WHEN type='TV Show' THEN 1 END) TV_Shows
+FROM netflix
+WHERE release_year>=2008 AND EXTRACT(YEAR FROM date_added)=release_year
+GROUP BY EXTRACT(YEAR FROM date_added)
+ORDER BY year_added;                            --- Movies added in same year--
 
--- For TV Shows
-SELECT date_added_year, COUNT(*)Total_Content FROM netflix_data
-WHERE type ='TV Show'
-GROUP BY date_added_year
-ORDER BY Total_Content DESC
-LIMIT 10;
+SELECT release_year, COUNT(CASE WHEN type = 'Movie' THEN 1 END) AS Movies,
+    COUNT(CASE WHEN type = 'TV Show' THEN 1 END) AS TV_Shows
+	FROM netflix
+	WHERE release_year>=2008
+	GROUP BY release_year
+	ORDER BY release_year;   -- total actual release in a year --
 ```
+![Image](https://github.com/user-attachments/assets/fa754187-b739-4712-8448-5886573e920a)
 
-### 4. Is there a trend in Netflix adding "fresh" Movies & TV Show those released within the same year as their original release date?
-
-```sql
-WITH release_year AS (
-SELECT date_added_year,
-COUNT(CASE WHEN date_added_year=release_year AND type='Movie' THEN 1 ELSE NULL END) Movies,
-COUNT(CASE WHEN date_added_year=release_year AND type='TV Show' THEN 1 ELSE NULL END) TV_Shows,
-COUNT(CASE WHEN type='Movie' THEN 1 ELSE NULL END) Total_Movies,
-COUNT(CASE WHEN type='TV Show' THEN 1 ELSE NULL END) Total_TV_Show
-FROM netflix_data
-GROUP BY date_added_year
-ORDER BY Movies DESC
-LIMIT 6)
-
-SELECT date_added_year, Movies,
-ROUND((Movies::numeric/Total_Movies)*100,2) Achievement_percentage_of_movies,
-TV_Shows,
-ROUND((TV_Shows::numeric/Total_TV_Show)*100,2) Achievement_percentage_of_tv_shows
-FROM release_year;
-```
-
-### 5.  How are Movies and TV Shows distributed across each country, and are there notable differences in content availability by region?
+### 4. Content Distribution Across Countries
 
 ```sql
-WITH content_across_countries AS (
-SELECT type, country,
-       UNNEST(string_to_array(country, ',')) AS available_country
-FROM netflix_data)
-
-SELECT TRIM(available_country) Country, 
-COUNT(CASE WHEN type='Movie' THEN 1 ELSE NULL END) Total_movie_content,
-COUNT(CASE WHEN type='TV Show' THEN 1 ELSE NULL END) Total_tvshow_content
-FROM content_across_countries
-GROUP BY TRIM(available_country)
-ORDER BY Total_movie_content DESC;
-```
-
-### 6. What are the most popular ratings for Movies and TV Shows in different countries?
-
-```sql
--- Rating Across Countries -- 
-WITH content_across_country AS (
-SELECT rating, country,
-       UNNEST(string_to_array(country, ',')) AS available_country
-FROM netflix_data),
-
-content_across_countries_with_rating as (
-SELECT TRIM(available_country) Country, rating, COUNT(*) Total_Content
-FROM content_across_country
-WHERE available_country <>''
-GROUP BY TRIM(available_country), rating
-ORDER BY TRIM(available_country))
-
-SELECT r.country, r.rating, r.total_content FROM 
- (SELECT * ,
- RANK() OVER (PARTITION BY country ORDER BY total_content DESC) ranking
- FROM content_across_countries_with_rating)r
-WHERE ranking =1
-ORDER BY total_content DESC;
-
--- Most rating across countries by types --
-WITH content_across_country AS (
-SELECT country, type, rating,
-       UNNEST(string_to_array(country,',')) AS available_country
-FROM netflix_data),
-
-Content_across_countries_type AS (
-SELECT TRIM(available_country) Country, type, rating, COUNT(*) Total_Content
-FROM content_across_country
-WHERE available_country <>''
-GROUP BY TRIM(available_country), type, rating
-ORDER BY TRIM(available_country))
-
-SELECT q.Country, q.type, q.rating, q.total_content FROM 
- (SELECT * ,
- RANK() OVER (PARTITION BY country, type ORDER BY total_content DESC) ranking
- FROM Content_across_countries_type)q
-WHERE ranking =1
-ORDER BY total_content DESC, country asc;
-```
-
-### 7. Are there specific genre preferences within each country, and are any genres particularly popular?
-
-```sql
-WITH country_with_genre AS (
-SELECT listed_in,
-       UNNEST(string_to_array(country,',')) AS available_country
-FROM netflix_data),
-
-Countries_and_genre AS (
-SELECT TRIM(available_country) Country,listed_in, COUNT(*) Total_Content
-FROM country_with_genre
-WHERE available_country <>''
-GROUP BY TRIM(available_country),listed_in
-ORDER BY TRIM(available_country))
-
-SELECT q.Country, q.listed_in, q.total_content FROM 
- (SELECT * ,
- RANK() OVER (PARTITION BY country ORDER BY total_content DESC) ranking
- FROM Countries_and_genre)q
-WHERE ranking =1
-ORDER BY total_content DESC, country asc;
-```
-
-### 8. How does the popularity of various genres differ between Movies and TV Shows across countries?
-
-```sql
-WITH country_with_genre AS (
-SELECT listed_in,type,
-       UNNEST(string_to_array(country,',')) AS available_country
-FROM netflix_data),
-
-Countries_and_genre AS (
-SELECT TRIM(available_country) Country,type, listed_in, COUNT(*) Total_Content
-FROM country_with_genre
-WHERE available_country <>''
-GROUP BY TRIM(available_country),type, listed_in
-ORDER BY TRIM(available_country))
-
-SELECT q.Country, q.type, q.listed_in, q.total_content FROM 
- (SELECT * ,
- RANK() OVER (PARTITION BY country,type ORDER BY total_content DESC) ranking
- FROM Countries_and_genre)q
-WHERE ranking =1
-ORDER BY total_content DESC, country asc;
-```
-
-### 9. Does Netflix prioritize "fresh" content releases by genre in each country to maximize audience reach?
-
-```sql
-WITH Countries_with_genre AS (
+WITH countries_and_content AS (
+    SELECT 
+        TRIM(UNNEST(STRING_TO_ARRAY(country, ','))) AS Country, 
+        type 
+    FROM netflix
+)
 SELECT 
-TRIM(UNNEST(string_to_array(country, ','))) AS available_country,
-release_year, date_added_year, listed_in
-FROM netflix_data),
+    Country, 
+    COUNT(CASE WHEN type = 'Movie' THEN 1 END) AS Movies,
+    COUNT(CASE WHEN type = 'TV Show' THEN 1 END) AS TV_Shows
+FROM countries_and_content
+GROUP BY Country
+ORDER BY Country;
+```
+![Image](https://github.com/user-attachments/assets/23d04fdf-2904-43bd-bf97-244559c45744)
+#### Insight: Netflix delivers a substantial share of its content to the United States, with 35% of movies and 31% of TV shows. However, limited availability of regional content could lead to viewer churn, as audiences tend to prefer content from their own country.
 
-Total_content AS (
-SELECT available_country,release_year, listed_in, COUNT(*) Total_content
-FROM Countries_with_genre
-GROUP BY available_country,release_year, listed_in),
 
-same_year_content AS (
-SELECT available_country AS Country, release_year, listed_in, COUNT(*) AS Total_content_with_same_year
-FROM countries_with_genre
-WHERE release_year = date_added_year
-GROUP BY Country, release_year, listed_in),
+### 5.  Rating Across Content Type
 
-content_with_same_year_and_total AS (
+```sql
+SELECT rating, COUNT(CASE WHEN type='Movie' THEN 1 END) Movies,
+COUNT(CASE WHEN type='TV Show' THEN 1 END) TV_Shows FROM netflix
+GROUP BY rating;
+```
+![Image](https://github.com/user-attachments/assets/119d242d-618c-4c58-8dc4-9da9015ae166)
+#### Insight: Mature audience-rated content dominates Netflix's library globally, as most countries feature this rating prominently. So the country with low content can release new Mature audience-rated regional content of their own which help to gain the market of each country.
+
+### 6. Genre for Movies & TV Show
+
+```sql
+WITH genre_and_content AS (
+    SELECT 
+        TRIM(UNNEST(STRING_TO_ARRAY(listed_in, ','))) AS genre, 
+        type 
+    FROM netflix
+)
 SELECT 
-    t.available_country,
-    t.release_year,
-    t.listed_in,
-    t.Total_content,
-    s.Total_content_with_same_year
-FROM Total_content t
-JOIN Same_year_content s
-    ON t.available_country = s.Country 
-   AND t.release_year = s.release_year 
-   AND t.listed_in = s.listed_in
-ORDER BY t.Total_content DESC),
-
-genre_in_countries AS (
-SELECT r.available_country,
-    r.release_year,
-    r.listed_in,
-    r.Total_content,
-	r.total_content_with_same_year
-	FROM (
-SELECT *,
-RANK() OVER (PARTITION BY available_country, release_year ORDER BY total_content DESC) Ranking
-FROM Content_with_same_year_and_total
-WHERE available_country <>''
-ORDER BY total_content Desc)r
-WHERE ranking=1)
-
-SELECT *,
-ROUND((total_content_with_same_year::numeric/total_content)*100,2) achievement_rate
-FROM genre_in_countries;
+    genre, 
+    COUNT(CASE WHEN type = 'Movie' THEN 1 END) AS Movies,
+    COUNT(CASE WHEN type = 'TV Show' THEN 1 END) AS TV_Shows
+FROM genre_and_content
+GROUP BY genre;
 ```
+![Image](https://github.com/user-attachments/assets/475e4879-59f7-49f2-b459-568fac9b9378)
+#### Insight : The top three genres for both movies and TV shows are International, Dramas, and Comedies. Notably, over 50% of movie content falls within these genres.
 
-### 10. Does Netflix prioritize "fresh" content releases by rating in each country based on local popularity?
+
+### 7. Actors and Director with most content in netflix
 
 ```sql
-WITH countries_fresh_genre AS (
-SELECT UNNEST(string_to_array(country,',')) AS available_country,
-release_year, type, rating FROM netflix_data
-WHERE date_added_year=release_year),
+SELECT director, COUNT(CASE WHEN type = 'Movie' THEN 1 END) AS Movies,
+    COUNT(CASE WHEN type = 'TV Show' THEN 1 END) AS TV_Shows FROM netflix
+GROUP BY director
+ORDER BY movies DESC
+OFFSET 1;          -- Directors
 
-country_with_genre AS (
-SELECT TRIM(available_country) country, release_year, type, rating, COUNT(rating) Total_Content
-FROM countries_fresh_genre
-WHERE TRIM(available_country) <>''
-GROUP BY country, release_year, type, rating)
 
-SELECT q.Country, q.release_year, type, q.rating, q.total_content FROM 
- (SELECT * ,
- RANK() OVER (PARTITION BY country, release_year,type ORDER BY total_content DESC) ranking
- FROM country_with_genre)q
-WHERE ranking =1
-ORDER BY total_content DESC, country asc;
+SELECT TRIM(UNNEST(STRING_TO_ARRAY(casts,','))) artist,
+COUNT(CASE WHEN type = 'Movie' THEN 1 END) AS Movies,
+    COUNT(CASE WHEN type = 'TV Show' THEN 1 END) AS TV_Shows
+FROM netflix
+GROUP BY artist;    --- Artist --
 ```
+![Image](https://github.com/user-attachments/assets/7a4a7c69-c9ce-4378-bbe0-72698234dc52)
 
-### 11. Do audiences show specific intrest in genre preferences, and are there particular rating preferences within those genres?
+### 8. Length of content in Movies & TV Show
 
 ```sql
-WITH Rating_across_genre AS (
-SELECT  listed_in,rating,COUNT(*) Total_Content
-FROM netflix_data
-GROUP BY listed_in,rating
-ORDER BY total_content DESC)
+SELECT duration, COUNT(*) total FROM netflix
+WHERE type='Movie'
+GROUP BY duration
+ORDER BY total DESC;                                         -- Movie Duration ---
 
-SELECT r.listed_in, r.rating,r.total_content FROM 
-(SELECT *,
-RANK() OVER (PARTITION BY listed_in ORDER BY total_content DESC) ranking
-FROM Rating_across_genre)r
-WHERE ranking=1
-ORDER BY r.total_content DESC;
+SELECT duration, COUNT(*) total FROM netflix
+WHERE type='TV Show'
+GROUP BY duration
+ORDER BY total DESC;                                      -- Web Series Duration -- 
 ```
-
-### 12. Are there actors who frequently appear in certain genres and ratings, and does their presence correlate with increased audience reach?
-
-```sql
-WITH artist_with_genre AS (
-SELECT 
-    listed_in, 
-    rating,
-    UNNEST(STRING_TO_ARRAY(casts, ',')) AS Artist
-FROM netflix_data)
-
-SELECT listed_in, TRIM(Artist) Artists, COUNT (*) Total_Content
-FROM artist_with_genre
-WHERE artist<>'Unknown'
-GROUP BY listed_in, TRIM(Artist)
-ORDER BY total_content DESC
-LIMIT 10;
-```
-
-## Findings
-- Most Netflix content for Movies and TV Shows is rated for mature audiences, with **60%** falling under the TV-MA rating. The remaining ratings are significantly lower by comparison. By expanding content in other rating categories, Netflix could potentially attract a broader audience and enhance viewership diversity.
-
-- The average yearly growth rate of Netflix content was around **176% for Movies** and **193% for TV Shows**. However, in **2020 and 2021**, this growth slowed, likely due to the **COVID-19 pandemic**, bringing the average growth rate down to **128% for Movies** and **163% for TV Shows**.
-
-- Netflix has been increasing its addition of “fresh” content (Movies & TV Shows released and added within the same year) compared to previous years. However, when comparing total Movies with their original release dates, Netflix still struggles to consistently deliver the content as fresh as possible, with an average freshness rating of **-4.618% from 2016-2021**. For TV Shows, there has been an average growth rate of **5.5%**, showing a steady but moderate increase in timely additions.
-
-- Netflix delivers a significant portion of its content to the United States, with **45%** of Movie content and **35%** of TV Show content available for U.S. viewers. This represents a notable disparity compared to other countries, highlighting a primary focus on the U.S. market.
-
-- Mature audience-rated content dominates Netflix's library globally, as most countries feature this rating prominently. However, certain countries stand out with a higher prevalence of other-rated content, surpassing mature audience ratings for both Movies and TV Shows.
-
-- In the United States, Netflix content leans heavily toward documentaries, while in India, popular genres include drama, international movies, or a combination of both. Japan's top genre is anime, reflecting varied preferences across countries. Although there’s minimal difference in genre distribution between Movies and TV Shows for most regions, some countries do show distinct preferences, with TV Show content differing slightly from Movies.
-
-- A few artists have appeared in specific genres more than 10 times, showcasing their strong association with those genres and their popularity within them.
+![Image](https://github.com/user-attachments/assets/2bfab8d3-53c9-4671-837e-a948c071407f)
+#### Insight : Most movies have a runtime of around 90 minutes, making the 1-2 hour range the most appealing choice for viewers seeking concise entertainment.
+**As the number of seasons increases, the volume of content decreases.Shorter seasons are ideal for moderately active viewers, while longer-running series with more seasons are better suited for engaging highly active audiences.**
 
 
 ## Suggestions
 
-- Expand content in underrepresented ratings to attract broader demographics, particularly in regions where mature content is less dominant.
+- Releasing movies on Netflix soon after their initial release helps create an early buzz and engage viewers effectively. The gap between a movie's release year and its addition to Netflix is generally longer compared to TV shows.
 
-- Aim to release Movies and TV Shows closer to their original release dates to capitalize on their initial buzz and increase audience engagement.
+- Currently, Netflix offers content across 20 different genres for both movies and TV shows, with international, drama, and comedies ranking as the top 3 in each category. Expanding and promoting diverse genres can help engage audiences seeking variety in their viewing preferences.
 
-- Promote frequently featured artists in specific genres to attract loyal fanbases and boost viewership.
+- Featuring the top 20 actors and directors in their respective fields can enhance viewer engagement, as audiences are more likely to watch movies associated with renowned names in the industry.
+
+- The United States has the highest content volume on Netflix, but providing regional content tailored to top user countries can be highly beneficial. Since the most-watched genre is international, viewers enjoy exploring films from other cultures. Focusing on creating mature dramas and comedies can be a great strategy, as mature content currently dominates Netflix's library. Additionally, movies with a runtime of 1-2 hours are increasingly popular, making them a perfect fit for viewers looking for a quick but engaging watch.
+
