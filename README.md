@@ -157,7 +157,7 @@ USING TO_DATE(date_added, 'YYYY-MM-DD');
 SELECT type, COUNT(*) total FROM netflix  -- Count of diff Content
 GROUP BY type;
 ```
-![schema](https://github.com/sibin-n/E-Commerce-Company-Case-Study/blob/main/schemaas.png?raw=true)
+
 
 ### 2. Which ratings are most common for Movies and TV Shows, and do certain ratings dominate specific content types?
 
